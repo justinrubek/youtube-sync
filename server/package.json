@@ -1,0 +1,29 @@
+{
+  "name": "hackbvu-server",
+  "version": "0.0.0",
+  "description": "",
+  "main": "dist/app.js",
+  "scripts": {
+    "build": "babel src -s -d dist --presets env",
+    "start": "node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "axios": "^0.18.0",
+    "express": "^4.16.3",
+    "fs": "0.0.1-security",
+    "fs-readfile-promise": "^3.0.1",
+    "http": "0.0.0",
+    "morgan": "^1.9.0",
+    "socketio": "^1.0.0",
+    "util": "^0.10.3"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-core": "^6.26.3",
+    "babel-preset-env": "^1.6.1",
+    "babel-polyfill": "^6.26.0"
+  }
+}
