@@ -1,6 +1,7 @@
 import "babel-polyfill";
 import app from "./app";
 import http from "http";
+import socketio from "socket.io";
 
 import config from "./config";
 
@@ -9,6 +10,16 @@ const port = normalizePort(process.env.PORT || config.port);
 app.set("port", port);
 
 const server = http.createServer(app);
+
+const io = socketio(server);
+
+io.on("connection", (socket) => {
+    console.log("Connection established");
+    socket.on("disconnect", (socket) => {
+        console.log("Disconnected");
+    })
+});
+
 
 // Listen on all network interfaces
 server.listen(port);

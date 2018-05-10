@@ -1,0 +1,79 @@
+ p, label {
+  color: #BDBDBD;
+}
+
+h1, h2, h3, h4 {
+  color: #09F;
+}
+
+body {
+  background-color: #101010;
+  font-family: sans-serif;
+}
+
+label {
+  padding: 12px 12px 12px 0;
+  display: inline-block;
+  font-size: 1.5rem;
+  padding: 5px 10px;
+}
+
+input[type=text], select, textarea {
+  color: #BDBDBD;
+  width: 100%;
+  padding: 12px 20px;
+  border: 1px solid #444;
+  border-radius: 1px;
+  background-color: #1d1d1d;
+}
+
+code {
+  padding: 4px 6px;
+  border: 1px solid #444;
+  border-radius: 2px;
+  background-color: #1d1d1d;
+}
+
+textarea {
+  height: 280px;
+}
+
+input[type=text]:focus, textarea:focus {
+  border: 1px solid #555;
+}
+
+button {
+  background-color: #09F;
+  color: #BDBDBD;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 1s ease;
+  font-weight: bold;
+}
+
+button:hover {
+  background-color: #07D;
+}
+
+button:disabled {
+  background-color: #507085;
+  cursor: not-allowed;
+}
+
+button:disabled:hover {
+  background-color: #507085;
+}
+
+select {
+  padding: 16px 20px;
+  border: none;
+  border-radius: 4px;
+} 
+
+hr {
+  background-color: #1D1D1D;
+  height: 2px;
+  border: none;
+}
