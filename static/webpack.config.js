@@ -44,6 +44,9 @@ const config = {
   },
   plugins: [
     new PrettierPlugin({
+      tabWidth: 4,
+      useTabs: false,
+      semi: true,
       extensions: [ '.js', '.jsx' ]
     }),
     new webpack.IgnorePlugin(/^\.\/locale$/, [/moment$/]),

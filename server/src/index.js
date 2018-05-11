@@ -13,13 +13,38 @@ const server = http.createServer(app);
 
 const io = socketio(server);
 
+let room = {
+    name: "default",
+    video_id: "c8W-auqg024",
+    status: "unstarted",
+    elapsed: 0
+}
 io.on("connection", (socket) => {
+    socket.join(room)
+
     console.log("Connection established");
     socket.on("disconnect", (socket) => {
         console.log("Disconnected");
     })
-});
+    socket.on("play", (data) => {
 
+        if (room.status != "playing") {
+            // Broadcast to rest of room
+            socket.to(room).emit("play", data);
+            room.status = "playing";
+            console.log(`Playing Video with data: ${data}`);
+        }
+
+    });
+
+    socket.on("pause", (data) => {
+        if (room.status != "paused") {
+            socket.to(room).emit("pause", data);
+            room.status = "paused";
+            console.log(`Pausing Video with data: ${data}`);
+        }
+    });
+});
 
 // Listen on all network interfaces
 server.listen(port);
