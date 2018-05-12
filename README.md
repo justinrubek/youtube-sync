@@ -1,6 +1,6 @@
 # Syncronized Youtube video playback
 
-This is a React+Express SPA that lets you watch Youtube videos in sync with friends over the internet.
+This is a React+Express SPA that lets you watch Youtube videos in sync with friends over the internet. Currently it is functional, but mostly just a proof of concept.
 
 ## Setup
 
