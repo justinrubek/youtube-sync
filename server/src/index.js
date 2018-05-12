@@ -44,11 +44,12 @@ let room = {
 io.on("connection", (socket) => {
     socket.join(room.name)
 
-    // Update information on room
-    socket.to(room.name).emit("ping")
+    // Setup the newcomer to the current video
+    socket.emit("change", room.video_id);
+    if (room.status == "playing") {
+        // Find out how far in the video we are to catch up
 
-    // Alert the client 
-    socket.emit("join", room);
+    }
 
     console.log("Connection established");
     console.log(room);
