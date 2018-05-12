@@ -3,7 +3,7 @@ import Youtube from "react-youtube";
 import io from "socket.io-client";
 const socket = io();
 
-const playerstate = {
+const PlayerState = {
     "-1": "unstarted",
     "0": "ended",
     "1": "playing",
@@ -50,25 +50,30 @@ export default class SyncedYoutubePlayer extends Component {
     playerOnStateChange(event) {
         const { player, previous_player_state } = this.state;
 
-        if (previous_player_state == playerstate[event.data]) {
-            // Maybe just do offset checking?
-            return;
-        }
-
-        const new_player_state = playerstate[event.data];
+        const new_player_state = event.data;
+        const url = player.getVideoUrl();
         const elapsed = player.getCurrentTime();
-        const data = {
-            time: elapsed
+
+        const state = {
+            player_state: new_player_state,
+            url: url,
+            elapsed: elapsed,
+            timestamp: Date.now() / 1000
         };
 
-        console.log(new_player_state);
-        if (new_player_state == "playing") {
+        if (this.state.submitupdate == true) {
+            socket.emit("update", state);
+            console.log("update");
+        }
+        /*
+        if (new_player_state == YT.PlayerState.PLAYING) {
             socket.emit("play", data);
         }
-        if (new_player_state == "paused") {
+        if (new_player_state == YT.PlayerState.PAUSED) {
             socket.emit("pause", data);
         }
         this.setState({ previous_player_state: new_player_state });
+        */
     }
 
     playerOnReady(event) {
@@ -81,13 +86,27 @@ export default class SyncedYoutubePlayer extends Component {
         );
 
         socket.on("play", data => {
-            player.seekTo(data.time);
+            this.setState({ submitupdate: false });
             player.playVideo();
+            console.log("playVideo");
+            this.setState({ submitupdate: true });
         });
 
         socket.on("pause", data => {
+            this.setState({ submitupdate: false });
             player.pauseVideo();
-            player.seekTo(data.time);
+            console.log("pauseVideo");
+            this.setState({ submitupdate: true });
+        });
+
+        socket.on("seek", time => {
+            this.setState({ submitupdate: false });
+            if (player.getPlayerState() == YT.PlayerState.PLAYING) {
+                time += 0.7;
+            }
+            player.seekTo(time);
+            console.log("seek");
+            this.setState({ submitupdate: true });
         });
     }
 }

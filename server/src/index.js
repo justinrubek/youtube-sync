@@ -4,6 +4,7 @@ import http from "http";
 import socketio from "socket.io";
 
 import config from "./config";
+import { stat } from "fs";
 
 
 const port = normalizePort(process.env.PORT || config.port);
@@ -13,24 +14,83 @@ const server = http.createServer(app);
 
 const io = socketio(server);
 
+const PlayerState = {
+    "-1": "unstarted",
+    "0": "ended",
+    "1": "playing",
+    "2": "paused",
+    "3": "buffering",
+    "4": "cued"
+};
 let room = {
     name: "default",
     video_id: "c8W-auqg024",
     status: "unstarted",
-    elapsed: 0
-}
+    elapsed: 0,
+    time: Date.now() / 1000
+};
 io.on("connection", (socket) => {
-    socket.join(room)
+    socket.join(room.name)
+
+    // Update information on room
+    socket.to(room.name).emit("ping")
+
+    // Alert the client 
+    socket.emit("join", room);
 
     console.log("Connection established");
     socket.on("disconnect", (socket) => {
         console.log("Disconnected");
     })
-    socket.on("play", (data) => {
 
+    socket.on("update", (player_data) => {
+        // Determine if there is enough variation that we need to resync
+        const { player_state, url, elapsed, timestamp } = player_data;
+
+        let new_time = Date.now() / 1000;
+        if (new_time < room.time)
+            new_time = room.time;
+
+        // Calculate how much time the video elapsed
+        const new_elapsed = new_time - room.time;
+        let diff = Math.abs(new_elapsed - elapsed)
+        console.log(`elapsed: ${elapsed}`)
+        console.log(`new_elapsed: ${new_elapsed}`)
+        console.log(`diff: ${diff}`)
+        if (diff > 5) {
+            // Send out to other sockets that the time has updated
+            socket.to(room.name).emit("seek", elapsed);
+        }
+
+        // If so, update all sockets in room
+        const state = PlayerState[player_state];
+        console.log(`State: ${state}`)
+        console.log(`PlayerState: ${PlayerState[player_state]}`)
+        if (state != room.status) {
+            const now = (Date.now() / 1000) - elapsed;
+            switch(state) {
+                case "playing":
+                    socket.to(room.name).emit("play")
+                    room.status = "playing"
+                    room.time = (Date.now() / 1000) - elapsed
+                    break;
+                case "paused":
+                    socket.to(room.name).emit("pause")
+                    room.status = "paused";
+                    room.time
+                    break;
+                default:
+                    break;
+            }
+        }
+        
+        // Finally return the new room state?
+    });
+
+    socket.on("play", (data) => {
         if (room.status != "playing") {
             // Broadcast to rest of room
-            socket.to(room).emit("play", data);
+            socket.to(room.name).emit("play", data);
             room.status = "playing";
             console.log(`Playing Video with data: ${data}`);
         }
@@ -39,7 +99,7 @@ io.on("connection", (socket) => {
 
     socket.on("pause", (data) => {
         if (room.status != "paused") {
-            socket.to(room).emit("pause", data);
+            socket.to(room.name).emit("pause", data);
             room.status = "paused";
             console.log(`Pausing Video with data: ${data}`);
         }
