@@ -2,10 +2,22 @@ import "babel-polyfill";
 import app from "./app";
 import http from "http";
 import socketio from "socket.io";
+import YoutubeVideoId from "youtube-video-id";
 
 import config from "./config";
 import { stat } from "fs";
 
+function video_id(url) {
+    let video_id = url.split('v=')[1];
+    
+    // Should verify video_id
+    let ampersandPosition = video_id.indexOf('&');
+    if (ampersandPosition != -1) {
+      video_id = video_id.substring(0, ampersandPosition);
+    }
+
+    return video_id;
+}
 
 const port = normalizePort(process.env.PORT || config.port);
 app.set("port", port);
@@ -39,6 +51,8 @@ io.on("connection", (socket) => {
     socket.emit("join", room);
 
     console.log("Connection established");
+    console.log(room);
+    console.log(room.name);
     socket.on("disconnect", (socket) => {
         console.log("Disconnected");
     })
@@ -46,6 +60,18 @@ io.on("connection", (socket) => {
     socket.on("update", (player_data) => {
         // Determine if there is enough variation that we need to resync
         const { player_state, url, elapsed, timestamp } = player_data;
+
+        const id = video_id(url);
+        if (id != room.video_id) {
+            // We've changed the video
+            console.log(`changed video id old(${room.video_id}) new(${id})`)
+            room.time = Date.now() / 1000
+            room.video_id = id;
+            room.elapsed = 0;
+            room.status = "unstarted";
+            socket.to(room.name).emit("change", id);
+            return;
+        }
 
         let new_time = Date.now() / 1000;
         if (new_time < room.time)

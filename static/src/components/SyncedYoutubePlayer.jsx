@@ -1,5 +1,9 @@
 import React, { Component } from "react";
 import Youtube from "react-youtube";
+import YoutubeVideoId from "youtube-video-id";
+
+import Selector from "./YoutubeVideoPicker";
+
 import io from "socket.io-client";
 const socket = io();
 
@@ -16,11 +20,22 @@ export default class SyncedYoutubePlayer extends Component {
     constructor(props) {
         super(props);
 
-        this.state = {};
+        this.state = {
+            player: null
+        };
 
         // Bind methods to this
         this.playerOnReady = this.playerOnReady.bind(this);
         this.playerOnStateChange = this.playerOnStateChange.bind(this);
+        this.onSelectVideo = this.onSelectVideo.bind(this);
+    }
+
+    onSelectVideo(video_url) {
+        const { player } = this.state;
+
+        const id = YoutubeVideoId(video_url);
+
+        player.loadVideoById(id);
     }
 
     render() {
@@ -38,16 +53,20 @@ export default class SyncedYoutubePlayer extends Component {
         };
 
         return (
-            <Youtube
-                videoId={video_id}
-                opts={options}
-                onReady={this.playerOnReady}
-                onStateChange={this.playerOnStateChange}
-            />
+            <div>
+                <Selector onSelect={this.onSelectVideo} />
+                <Youtube
+                    videoId={video_id}
+                    opts={options}
+                    onReady={this.playerOnReady}
+                    onStateChange={this.playerOnStateChange}
+                />
+            </div>
         );
     }
 
     playerOnStateChange(event) {
+        console.log("Player state change");
         const { player, previous_player_state } = this.state;
 
         const new_player_state = event.data;
@@ -61,10 +80,8 @@ export default class SyncedYoutubePlayer extends Component {
             timestamp: Date.now() / 1000
         };
 
-        if (this.state.submitupdate == true) {
-            socket.emit("update", state);
-            console.log("update");
-        }
+        socket.emit("update", state);
+        console.log("update");
         /*
         if (new_player_state == YT.PlayerState.PLAYING) {
             socket.emit("play", data);
@@ -86,27 +103,26 @@ export default class SyncedYoutubePlayer extends Component {
         );
 
         socket.on("play", data => {
-            this.setState({ submitupdate: false });
             player.playVideo();
             console.log("playVideo");
-            this.setState({ submitupdate: true });
         });
 
         socket.on("pause", data => {
-            this.setState({ submitupdate: false });
             player.pauseVideo();
             console.log("pauseVideo");
-            this.setState({ submitupdate: true });
+        });
+
+        socket.on("change", new_id => {
+            player.pauseVideo();
+            player.loadVideoById(new_id);
         });
 
         socket.on("seek", time => {
-            this.setState({ submitupdate: false });
             if (player.getPlayerState() == YT.PlayerState.PLAYING) {
                 time += 0.7;
             }
             player.seekTo(time);
             console.log("seek");
-            this.setState({ submitupdate: true });
         });
     }
 }
