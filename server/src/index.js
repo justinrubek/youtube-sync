@@ -1,11 +1,18 @@
 import "babel-polyfill";
 import app from "./app";
 import http from "http";
+import redis from "redis";
+import bluebird from "bluebird";
 import socketio from "socket.io";
 import YoutubeVideoId from "youtube-video-id";
 
+import SimulatedVideo from "../../lib/SimulatedVideo";
+
 import config from "./config";
 import { stat } from "fs";
+
+bluebird.promisifyAll(redis.RedisClient.prototype);
+bluebird.promisifyAll(redis.Multi.prototype);
 
 function video_id(url) {
     let video_id = url.split('v=')[1];
@@ -26,6 +33,8 @@ const server = http.createServer(app);
 
 const io = socketio(server);
 
+const r_client = redis.createClient(config.redis_port, config.redis_host, config.redis_options);
+
 const PlayerState = {
     "-1": "unstarted",
     "0": "ended",
@@ -41,8 +50,30 @@ let room = {
     elapsed: 0,
     time: Date.now() / 1000
 };
-io.on("connection", (socket) => {
-    socket.join(room.name)
+// This is
+io.on("connection", async (socket) => {
+    const requested_room = socket.handshake.query.room;
+
+    // Check if room exists in redis
+    // If not, create it
+    const rooms = await r_client.lrangeAsync("rooms", 0, -1);
+    let room_exists = false;
+    for (let room of rooms) {
+        if (room == requested_room)
+            room_exists = true;
+    }
+
+    if (room_exists == false) {
+        // Create the room
+        r_client.rpush(["rooms", requested_room], () => { });
+        r_client.set("rooms:" + requested_room + ":video_id", config.default_video_id);
+        r_client.hmset("rooms:" + requested_room + ":simulation", new SimulatedVideo())
+    }
+    else {
+        // Get the info of the room
+        // Send it to the client
+    }
+    socket.join(requested_room);
 
     // Setup the newcomer to the current video
     socket.emit("change", room.video_id);

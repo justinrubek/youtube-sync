@@ -5,7 +5,6 @@ import YoutubeVideoId from "youtube-video-id";
 import Selector from "./YoutubeVideoPicker";
 
 import io from "socket.io-client";
-const socket = io();
 
 const PlayerState = {
     "-1": "unstarted",
@@ -67,7 +66,7 @@ export default class SyncedYoutubePlayer extends Component {
 
     playerOnStateChange(event) {
         console.log("Player state change");
-        const { player, previous_player_state } = this.state;
+        const { player, previous_player_state, socket } = this.state;
 
         const new_player_state = event.data;
         const url = player.getVideoUrl();
@@ -94,6 +93,7 @@ export default class SyncedYoutubePlayer extends Component {
     }
 
     playerOnReady(event) {
+        const socket = io("", { query: "room=default" });
         const player = event.target;
         this.setState({ player: player, connected: true });
         console.log(event.target);
@@ -124,6 +124,7 @@ export default class SyncedYoutubePlayer extends Component {
             player.seekTo(time);
             console.log("seek");
         });
+        this.setState({ socket: socket });
     }
 }
 

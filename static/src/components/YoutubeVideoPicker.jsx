@@ -15,7 +15,6 @@ export default class YoutubeVideoPicker extends Component {
     onClick() {
         const { value } = this.state;
         this.props.onSelect(value);
-        //socket.emit("change", value);
     }
 
     onChange(e) {
