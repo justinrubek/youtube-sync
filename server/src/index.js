@@ -1,4 +1,5 @@
 import "babel-polyfill";
+
 import app from "./app";
 import http from "http";
 import redis from "redis";
@@ -6,7 +7,12 @@ import bluebird from "bluebird";
 import socketio from "socket.io";
 import YoutubeVideoId from "youtube-video-id";
 
-import SimulatedVideo from "../../lib/SimulatedVideo";
+import register_socket from "./sockethandler";
+import { roomExists, createRoom, getRoomInfo, setRoomInfo, getSimulationInfo, setSimulationInfo } from "./roomutil";
+
+// import SimulatedVideo from "../../lib/SimulatedVideo";
+//import SimulatedVideo from "./SimulatedVideo";
+import { SimulatedVideo } from "../../lib";
 
 import config from "./config";
 import { stat } from "fs";
@@ -22,7 +28,7 @@ function video_id(url) {
     if (ampersandPosition != -1) {
       video_id = video_id.substring(0, ampersandPosition);
     }
-
+  
     return video_id;
 }
 
@@ -33,8 +39,6 @@ const server = http.createServer(app);
 
 const io = socketio(server);
 
-const r_client = redis.createClient(config.redis_port, config.redis_host, config.redis_options);
-
 const PlayerState = {
     "-1": "unstarted",
     "0": "ended",
@@ -43,131 +47,49 @@ const PlayerState = {
     "3": "buffering",
     "4": "cued"
 };
-let room = {
-    name: "default",
-    video_id: "c8W-auqg024",
-    status: "unstarted",
-    elapsed: 0,
-    time: Date.now() / 1000
-};
-// This is
+
 io.on("connection", async (socket) => {
     const requested_room = socket.handshake.query.room;
+    console.log("connecting");
+    // console.log("Connection opened for room: " + requested_room);
 
-    // Check if room exists in redis
-    // If not, create it
-    const rooms = await r_client.lrangeAsync("rooms", 0, -1);
-    let room_exists = false;
-    for (let room of rooms) {
-        if (room == requested_room)
-            room_exists = true;
-    }
-
-    if (room_exists == false) {
-        // Create the room
-        r_client.rpush(["rooms", requested_room], () => { });
-        r_client.set("rooms:" + requested_room + ":video_id", config.default_video_id);
-        r_client.hmset("rooms:" + requested_room + ":simulation", new SimulatedVideo())
+    let room_info;
+    if (await roomExists(requested_room) == false) {
+      console.log("Creating room");
+      room_info = createRoom(requested_room);
     }
     else {
-        // Get the info of the room
-        // Send it to the client
+      console.log("Room exists, joining...");
+      room_info = await getRoomInfo(requested_room);
     }
+
     socket.join(requested_room);
 
-    // Setup the newcomer to the current video
-    socket.emit("change", room.video_id);
-    if (room.status == "playing") {
-        // Find out how far in the video we are to catch up
+    let sim_state = room_info.simulation.getState();
+    console.log("Room sim state: " + JSON.stringify(sim_state));
+    // socket.emit("initialize", sim_state);
 
+    // Setup the newcomer to the current video
+    console.log("Changing newcomer id to: " + room_info.video_id);
+    socket.emit("change", room_info.video_id);
+
+    if (sim_state.status == "playing") {
+        // Find out how far in the video we are to catch up
+      const elapsed = sim_state.elapsed;
+      console.log("Seeking to: " + elapsed);
+      // Update the client's time
+      socket.emit("seek", elapsed);
     }
 
-    console.log("Connection established");
-    console.log(room);
-    console.log(room.name);
-    socket.on("disconnect", (socket) => {
-        console.log("Disconnected");
-    })
-
-    socket.on("update", (player_data) => {
-        // Determine if there is enough variation that we need to resync
-        const { player_state, url, elapsed, timestamp } = player_data;
-
-        const id = video_id(url);
-        if (id != room.video_id) {
-            // We've changed the video
-            console.log(`changed video id old(${room.video_id}) new(${id})`)
-            room.time = Date.now() / 1000
-            room.video_id = id;
-            room.elapsed = 0;
-            room.status = "unstarted";
-            socket.to(room.name).emit("change", id);
-            return;
-        }
-
-        let new_time = Date.now() / 1000;
-        if (new_time < room.time)
-            new_time = room.time;
-
-        // Calculate how much time the video elapsed
-        const new_elapsed = new_time - room.time;
-        let diff = Math.abs(new_elapsed - elapsed)
-        console.log(`elapsed: ${elapsed}`)
-        console.log(`new_elapsed: ${new_elapsed}`)
-        console.log(`diff: ${diff}`)
-        if (diff > 5) {
-            // Send out to other sockets that the time has updated
-            socket.to(room.name).emit("seek", elapsed);
-        }
-
-        // If so, update all sockets in room
-        const state = PlayerState[player_state];
-        console.log(`State: ${state}`)
-        console.log(`PlayerState: ${PlayerState[player_state]}`)
-        if (state != room.status) {
-            const now = (Date.now() / 1000) - elapsed;
-            switch(state) {
-                case "playing":
-                    socket.to(room.name).emit("play")
-                    room.status = "playing"
-                    room.time = (Date.now() / 1000) - elapsed
-                    break;
-                case "paused":
-                    socket.to(room.name).emit("pause")
-                    room.status = "paused";
-                    room.time
-                    break;
-                default:
-                    break;
-            }
-        }
-        
-        // Finally return the new room state?
-    });
-
-    socket.on("play", (data) => {
-        if (room.status != "playing") {
-            // Broadcast to rest of room
-            socket.to(room.name).emit("play", data);
-            room.status = "playing";
-            console.log(`Playing Video with data: ${data}`);
-        }
-
-    });
-
-    socket.on("pause", (data) => {
-        if (room.status != "paused") {
-            socket.to(room.name).emit("pause", data);
-            room.status = "paused";
-            console.log(`Pausing Video with data: ${data}`);
-        }
-    });
+    // Register socket for room updates
+    console.log("Registering socket with room");
+    register_socket(requested_room, socket);
 });
 
 // Listen on all network interfaces
-server.listen(port);
 server.on("error", onError);
 server.on("listening", onListening);
+server.listen(port);
 
 function normalizePort(val) {
   const port = parseInt(val, 10);
