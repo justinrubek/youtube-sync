@@ -82,7 +82,7 @@ io.on("connection", async (socket) => {
     }
 
     // Register socket for room updates
-    console.log("Registering socket with room");
+    console.log("About to register socket with room " + requested_room);
     register_socket(requested_room, socket);
 });
 

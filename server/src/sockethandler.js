@@ -37,11 +37,11 @@ const PlayerState = {
 
 // Export a function that registers a socket to events related to its room
 export default function register(room_name, socket) {
-  console.log("Registering socket");
+  console.log("Registering socket for room: " + room_name);
 
-  socket.on("update", (data) => update(room_name, data));
-  socket.on("play", (data) => play(room_name, data));
-  socket.on("pause", (data) => pause(room_name, data));
+  socket.on("update", (data) => update(room_name, data, socket));
+  socket.on("play", (data) => play(room_name, data, socket));
+  socket.on("pause", (data) => pause(room_name, data, socket));
 
   socket.on("disconnect", (socket) => {
         console.log("Disconnected from " + room_name);
@@ -50,9 +50,9 @@ export default function register(room_name, socket) {
     });
 }
 
-async function update(room_name, player_data) {
+async function update(room_name, player_data, source) {
     // sim_state and url in data
-    console.log("Received update with data: " + JSON.stringify(player_data));
+    console.log(room_name + " received update with data: " + JSON.stringify(player_data));
     const { player_state, url, elapsed, timestamp } = player_data;
 
     // Determine if there is enough variation that we need to resync
@@ -66,7 +66,7 @@ async function update(room_name, player_data) {
       sim.seek(0);
       sim.pause();
       setRoomInfo(room_name, { video_id: id, simulation: sim.getState() });
-      socket.to(room_name).emit("change", id);
+      source.to(room_name).emit("change", id);
       return;
     }
 
@@ -78,22 +78,22 @@ async function update(room_name, player_data) {
     // Allow some wiggle room
     if (diff > 5) {
         // Send out to other sockets that the time has updated
-        socket.to(room_name).emit("seek", elapsed);
+        source.to(room_name).emit("seek", elapsed);
         sim.seek(elapsed);
         setSimulationInfo(room_name, sim.getState());
     }
 
     // Check for state changes
     const state = PlayerState[player_state];
-    if (state != sim_state.status) {
+    if (state != sim_state.status) {                                                                                                                   
         // const now = (Date.now() / 1000) - elapsed;
         switch(state) {
             case "playing":
-                socket.to(room_name).emit("play");
+                source.to(room_name).emit("play");
                 sim.play();
                 break;
             case "paused":
-                socket.to(room_name).emit("pause");
+                source.to(room_name).emit("pause");
                 sim.pause();
                 break;
             default:
@@ -106,28 +106,28 @@ async function update(room_name, player_data) {
     // Finally return the new room state?
 }
 
-async function play(room_name, data) {
-  console.log("Received play with data: " + JSON.stringify(data));
+async function play(room_name, data, source) {
+  console.log(room_name + " received play with data: " + JSON.stringify(data));
   const roomInfo = await getRoomInfo(room_name);
   const sim = roomInfo.simulation;
   const sim_state = sim.getState();
 
   if (sim_state.status != "playing") {
       // Broadcast to rest of room
-      socket.to(room_name).emit("play", data);
+      source.to(room_name).emit("play", data);
       sim.play();
       setSimulationInfo(room_name, sim.getState());
   }
 }
 
-async function pause(room_name, data) {
-  console.log("Received pause with data: " + JSON.stringify(data));
+async function pause(room_name, data, source) {
+  console.log(room_name + " received pause with data: " + JSON.stringify(data));
   const roomInfo = await getRoomInfo(room_name);
   const sim = roomInfo.simulation;
   const sim_state = sim.getState();
 
   if (sim_state.status != "paused") {
-      socket.to(room_name).emit("pause", data);
+      source.to(room_name).emit("pause", data);
       sim.pause();
       setSimulationInfo(room_name, sim.getState());
   }
