@@ -1,7 +1,7 @@
 import redis from "redis";
 import bluebird from "bluebird";
 import socketio from "socket.io";
-import YoutubeVideoId from "youtube-video-id";
+import urlParser from "js-video-url-parser";
 
 import { SimulatedVideo } from "../../lib";
 import { roomExists, createRoom, getRoomInfo, setRoomInfo, getSimulationInfo, setSimulationInfo } from "./roomutil";
@@ -13,15 +13,6 @@ bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
 
 function video_id(url) {
-    let video_id = url.split('v=')[1];
-    
-    // Should verify video_id
-    let ampersandPosition = video_id.indexOf('&');
-    if (ampersandPosition != -1) {
-      video_id = video_id.substring(0, ampersandPosition);
-    }
-  
-    return video_id;
 }
 
 const r_client = redis.createClient(config.redis_port, config.redis_host, config.redis_options);
@@ -42,12 +33,35 @@ export default function register(room_name, socket) {
   socket.on("update", (data) => update(room_name, data, socket));
   socket.on("play", (data) => play(room_name, data, socket));
   socket.on("pause", (data) => pause(room_name, data, socket));
+  socket.on("change", (data) => change(room_name, data, socket));
 
   socket.on("disconnect", (socket) => {
         console.log("Disconnected from " + room_name);
         // Probably check to see if room is empty?
         // Perhaps that should be left for the video end
     });
+}
+
+async function change(room_name, video_url, source) {
+    console.log(room_name + " received change with data: " + JSON.stringify(video_url));
+
+    console.log("Getting room info");
+    let roomInfo = await getRoomInfo(room_name);
+    
+    console.log("Converting url to id");
+    const video_info = urlParser.parse(url);
+    console.log(JSON.stringify(video_info));
+  
+    const id = video_info.id;
+    console.log("id determined to be: "+ id);
+    if (id != roomInfo.video_id) {
+      // Reset the room time to the beginning
+      sim.seek(0);
+      sim.pause();
+      setRoomInfo(room_name, { video_id: id, simulation: sim.getState() });
+      source.to(room_name).emit("change", id);
+      return;
+    }
 }
 
 async function update(room_name, player_data, source) {
@@ -132,6 +146,4 @@ async function pause(room_name, data, source) {
       setSimulationInfo(room_name, sim.getState());
   }
 }
-
-
 

@@ -20,18 +20,6 @@ import { stat } from "fs";
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
 
-function video_id(url) {
-    let video_id = url.split('v=')[1];
-    
-    // Should verify video_id
-    let ampersandPosition = video_id.indexOf('&');
-    if (ampersandPosition != -1) {
-      video_id = video_id.substring(0, ampersandPosition);
-    }
-  
-    return video_id;
-}
-
 const port = normalizePort(process.env.PORT || config.port);
 app.set("port", port);
 
@@ -67,11 +55,12 @@ io.on("connection", async (socket) => {
 
     let sim_state = room_info.simulation.getState();
     console.log("Room sim state: " + JSON.stringify(sim_state));
-    // socket.emit("initialize", sim_state);
 
     // Setup the newcomer to the current video
     console.log("Changing newcomer id to: " + room_info.video_id);
-    socket.emit("change", room_info.video_id);
+    socket.emit("change", { video_id: room_info.video_id, simulation: sim_state } );
+    // socket.emit("initialize", sim_state);
+    // Maybe initialize should handle all of it
 
     if (sim_state.status == "playing") {
         // Find out how far in the video we are to catch up

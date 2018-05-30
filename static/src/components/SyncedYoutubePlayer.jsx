@@ -21,7 +21,8 @@ export default class SyncedYoutubePlayer extends Component {
 
         this.state = {
             player: null,
-            previous_player_state: null
+            previous_player_state: null,
+            initialized: false
         };
 
         // Bind methods to this
@@ -31,11 +32,12 @@ export default class SyncedYoutubePlayer extends Component {
     }
 
     onSelectVideo(video_url) {
-        const { player } = this.state;
+        const { player, socket } = this.state;
 
         const id = YoutubeVideoId(video_url);
 
         player.loadVideoById(id);
+        socket.emit("change", video_url);
     }
 
     render() {
@@ -43,7 +45,7 @@ export default class SyncedYoutubePlayer extends Component {
         const { video_id } = this.props;
 
         const options = {
-            host: "https://www.youtube.com",
+            host: "http://www.youtube.com",
             width: "100%",
             height: "100%",
             playerVars: {
@@ -71,7 +73,8 @@ export default class SyncedYoutubePlayer extends Component {
             player,
             previous_player_state,
             socket,
-            simulation
+            simulation,
+            initialized
         } = this.state;
 
         const new_player_state = event.data;
@@ -91,8 +94,10 @@ export default class SyncedYoutubePlayer extends Component {
 
         // Check if this is our initial buffer upon video load
         if (new_player_state == 3) {
+            console.log("Buffering");
             // This is the initial buffering
             if (previous_player_state == -1) {
+                console.log("Initial buffer");
                 return;
             }
 
@@ -136,24 +141,47 @@ export default class SyncedYoutubePlayer extends Component {
         );
 
         socket.on("play", data => {
+            console.log("received play from server");
             seekTo(player, data);
             player.playVideo();
             console.log("playVideo");
         });
 
         socket.on("pause", data => {
+            console.log("received pause from server");
             seekTo(player, data);
             player.pauseVideo();
             console.log("pauseVideo");
         });
 
-        socket.on("change", new_id => {
-            player.pauseVideo();
-            player.loadVideoById(new_id);
+        socket.on("change", data => {
+            // socket.disconnect();
+            // this.setState({ socket: null });
+            console.log("received change from server");
+            const new_id = data.video_id;
+            if (data.simulation != null) {
+                player.loadVideoById({
+                    videoId: new_id,
+                    startSeconds: data.simulation.elapsed
+                });
+            } else {
+                player.loadVideoById(new_id);
+            }
         });
 
         socket.on("seek", time => {
+            console.log("received seek from server");
             seekTo(player, time);
+        });
+
+        socket.on("initialize", sim_state => {
+            seekTo(sim_state.elapsed);
+            if (sim_state.status == "playing") {
+                player.playVideo();
+            } else if (sim_state.status == "paused") {
+                player.pauseVideo();
+            }
+            this.setState({ initialized: true });
         });
         this.setState({ socket: socket });
     }
