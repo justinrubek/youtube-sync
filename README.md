@@ -4,7 +4,7 @@ This is a React+Express SPA that lets you watch Youtube videos in sync with frie
 
 ## Setup
 
-`git clone git@github.com:justinrubek/synctube-neo.git`
+`git clone https://github.com/justinrubek/youtube-sync.git`
 
 `cd synctube-neo`
 
